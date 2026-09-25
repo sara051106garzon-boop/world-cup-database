@@ -8,3 +8,38 @@ else
 fi
 
 # Do not change code above this line. Use the PSQL variable above to query your database.
+
+# Limpiar las tablas antes de insertar para evitar duplicados si se vuelve a ejecutar
+echo $($PSQL "TRUNCATE TABLE games, teams")
+
+# Leer el archivo games.csv omitiendo la primera línea (cabecera)
+cat games.csv | while IFS="," read YEAR ROUND WINNER OPPONENT WINNER_GOALS OPPONENT_GOALS
+do
+  if [[ $YEAR != "year" ]]
+  then
+    # 1. Verificar si el equipo ganador ya está en la tabla teams
+    WINNER_ID=$($PSQL "SELECT team_id FROM teams WHERE name='$WINNER'")
+    
+    # Si no existe, insertarlo
+    if [[ -z $WINNER_ID ]]
+    then
+      INSERT_WINNER_RESULT=$($PSQL "INSERT INTO teams(name) VALUES('$WINNER')")
+      # Obtener el nuevo team_id del ganador
+      WINNER_ID=$($PSQL "SELECT team_id FROM teams WHERE name='$WINNER'")
+    fi
+
+    # 2. Verificar si el equipo oponente ya está en la tabla teams
+    OPPONENT_ID=$($PSQL "SELECT team_id FROM teams WHERE name='$OPPONENT'")
+    
+    # Si no existe, insertarlo
+    if [[ -z $OPPONENT_ID ]]
+    then
+      INSERT_OPPONENT_RESULT=$($PSQL "INSERT INTO teams(name) VALUES('$OPPONENT')")
+      # Obtener el nuevo team_id del oponente
+      OPPONENT_ID=$($PSQL "SELECT team_id FROM teams WHERE name='$OPPONENT'")
+    fi
+
+    # 3. Insertar el partido en la tabla games con sus respectivos IDs y goles
+    INSERT_GAME_RESULT=$($PSQL "INSERT INTO games(year, round, winner_id, opponent_id, winner_goals, opponent_goals) VALUES($YEAR, '$ROUND', $WINNER_ID, $OPPONENT_ID, $WINNER_GOALS, $OPPONENT_GOALS)")
+  fi
+done
